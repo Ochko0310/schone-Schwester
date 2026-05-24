@@ -3001,7 +3001,10 @@ const CoupleNet = {
       return;
     }
     this.conn = conn;
-    this._setState('online');
+
+    // Wire data/close/error handlers immediately. State and outbox flush
+    // wait until the data channel is actually OPEN — otherwise sends are
+    // silently dropped by PeerJS.
     conn.on('data', (d) => this._emit('message', d));
     conn.on('close', () => {
       if (this.conn === conn) this.conn = null;
@@ -3011,9 +3014,17 @@ const CoupleNet = {
       }
     });
     conn.on('error', (e) => { console.warn('[CoupleNet] conn error', e); });
-    this._emit('connected');
-    // Flush queued messages
-    this._flushOutbox();
+
+    const onReady = () => {
+      if (this.conn !== conn) return; // we got replaced
+      this._setState('online');
+      this._emit('connected');
+      // Flush any messages queued while offline. Slight delay lets the
+      // 'connected' handler (in the React hook) emit hello+sync-bulk first.
+      setTimeout(() => this._flushOutbox(), 60);
+    };
+    if (conn.open) onReady();
+    else conn.on('open', onReady);
   },
 
   send(msg) {
