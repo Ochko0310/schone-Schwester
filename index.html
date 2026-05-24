@@ -1724,6 +1724,116 @@
     animation: blink 1s steps(2) infinite;
   }
 
+  /* === Pair-code box (setup screen) === */
+  .pair-code-box {
+    display: flex;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .pair-code-text {
+    flex: 1;
+    padding: 16px 10px;
+    background: var(--maroon);
+    color: var(--label);
+    border: 3px solid var(--ink);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 20px;
+    letter-spacing: 4px;
+    text-align: center;
+    box-shadow: inset 0 0 0 2px rgba(244, 217, 106, 0.3);
+  }
+  .pair-code-copy {
+    background: var(--ink);
+    color: var(--cream);
+    border: 3px solid var(--ink);
+    padding: 0 14px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 10px;
+    letter-spacing: 1px;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .pair-code-copy:hover { background: var(--maroon); }
+
+  /* === Presence badge in profile bar === */
+  .presence-badge {
+    margin-left: auto;
+    padding: 6px 10px;
+    border: 2px solid var(--cream);
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    letter-spacing: 1px;
+  }
+  .presence-badge.on { background: #2e6b3e; color: #d6f0de; }
+  .presence-badge.mid { background: #a07020; color: #fff3d6; animation: blink 1.4s steps(2) infinite; }
+  .presence-badge.off { background: #5a2a30; color: #ffcccc; }
+  .pair-badge {
+    background: var(--ink);
+    color: var(--label);
+    border: 2px solid var(--label);
+    padding: 6px 10px;
+    font-family: 'Press Start 2P', monospace;
+    font-size: 8px;
+    letter-spacing: 2px;
+  }
+  .profile-bar .profile-logout { margin-left: 0; }
+
+  .composer-presence {
+    margin-left: 10px;
+    font-family: 'Silkscreen', monospace;
+    font-size: 11px;
+    letter-spacing: 0.5px;
+  }
+  .composer-presence.on { color: #2e6b3e; }
+  .composer-presence.off { color: #a04b30; }
+
+  /* === Toast stack === */
+  .toast-stack {
+    position: fixed;
+    top: 14px;
+    right: 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    z-index: 4000;
+    max-width: min(360px, calc(100vw - 28px));
+    pointer-events: none;
+  }
+  .toast {
+    pointer-events: auto;
+    background: var(--cream);
+    border: 3px solid var(--ink);
+    box-shadow: 4px 4px 0 var(--maroon);
+    padding: 10px 36px 10px 14px;
+    font-family: 'VT323', monospace;
+    font-size: 18px;
+    color: var(--ink);
+    line-height: 1.35;
+    position: relative;
+    animation: toastIn 0.25s ease;
+  }
+  @keyframes toastIn {
+    from { opacity: 0; transform: translateX(20px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+  .toast-letter { background: #ffe9ee; }
+  .toast-alarm  { background: #fff3d6; }
+  .toast-track  { background: #d8ebeb; }
+  .toast-counter{ background: #e7e0c8; }
+  .toast-presence { background: #d6f0de; }
+  .toast-queued { background: #f3e3c4; }
+  .toast-close {
+    position: absolute;
+    top: 4px; right: 6px;
+    width: 22px; height: 22px;
+    border: 2px solid var(--ink);
+    background: var(--cream);
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1;
+    padding: 0;
+  }
+
   /* Vinyl saved-library list */
   .vinyl-library {
     list-style: none;
@@ -1772,6 +1882,8 @@
     cursor: pointer;
   }
   .lib-btn:hover { background: var(--maroon); }
+  .lib-btn.send { background: var(--teal); }
+  .lib-btn.send:hover { background: var(--teal-deep); }
   .lib-btn.del { background: var(--pink-hot); padding: 6px 9px; font-size: 11px; }
   .lib-btn.del:hover { background: var(--maroon-deep); }
 
@@ -2695,6 +2807,7 @@
   <script src="https://unpkg.com/react@18.3.1/umd/react.development.js" integrity="sha384-hD6/rw4ppMLGNu3tX5cjIb+uRZ7UkRJ6BPkLpg4hAu/6onKUg4lLsHAs9EBPT82L" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/react-dom@18.3.1/umd/react-dom.development.js" integrity="sha384-u6aeetuaXnQ38mYT8rp6sbXaQe3NL9t+IBXmnYxwkUI2Hw4bsp2Wvmx4yRQF1uAm" crossorigin="anonymous"></script>
   <script src="https://unpkg.com/@babel/standalone@7.29.0/babel.min.js" integrity="sha384-m08KidiNqLdpJqLq95G/LEi8Qvjl/xUYll3QILypMoQ65QorJ9Lvtp2RXYGBFj1y" crossorigin="anonymous"></script>
+  <script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
 
   <script>
   (function(){
@@ -2709,13 +2822,19 @@
   </script>
   <script type="text/babel" data-presets="react">
 /* === couple.jsx === */
-// ============ TWO-PERSON MODE ============
-// Each person uses their own device. Login with name + PIN.
-// State syncs via shareable hash links — PINs stay on-device only.
+// ============ TWO-PERSON MODE — P2P (PeerJS) ============
+// Pair code based real-time messenger. No URL hash. Each device has a stable
+// PeerJS ID derived from {pairCode, slot}; both peers attempt to connect to
+// each other every time the app loads. Letters, counter changes, alarm
+// changes, and shared vinyl tracks flow over a WebRTC data channel.
+// Messages sent while the partner is offline are queued in a local outbox
+// and flushed when the partner comes online.
 
-const { useState: cpUseState, useEffect: cpUseEffect, useRef: cpUseRef } = React;
+const { useState: cpUseState, useEffect: cpUseEffect, useRef: cpUseRef, useCallback: cpUseCallback } = React;
 
-const COUPLE_KEY = 'twosite.state.v2';
+const COUPLE_KEY = 'twosite.state.v3';
+const OUTBOX_KEY_PREFIX = 'twosite.outbox.v1.';
+const PEER_ID_PREFIX = 'mixtape-twosite-v1-';
 
 function cpLoad() {
   try {
@@ -2731,12 +2850,13 @@ function cpSave(state) {
 }
 function cpDefault() {
   return {
-    users: { a: { name: '' }, b: { name: '' } },
-    myUserId: null,    // 'a' | 'b' — who I am on this device
-    myPin: null,       // local-only, never synced
+    pairCode: null,
+    myUserId: null,        // 'a' (creator) | 'b' (joiner)
+    myPin: null,           // local-only
     isLoggedIn: false,
+    users: { a: { name: '' }, b: { name: '' } },
     letters: [],
-    counters: [],      // custom user-added counters
+    counters: [],
     alarms: [],
     setupAt: null,
   };
@@ -2744,111 +2864,395 @@ function cpDefault() {
 function cpUid() {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
-function cpEncode(state) {
-  // Share only the synced data (no PIN, no logged-in status, no myUserId)
-  const m = {
-    users: state.users,
-    letters: state.letters || [],
-    counters: state.counters || [],
-    alarms: state.alarms || [],
-  };
-  const json = JSON.stringify(m);
-  return btoa(unescape(encodeURIComponent(json)));
-}
-function cpDecode(enc) {
-  try {
-    const json = decodeURIComponent(escape(atob(enc)));
-    return JSON.parse(json);
-  } catch (e) { return null; }
-}
 function cpFmt(ts) {
   const d = new Date(ts);
   const pad = n => String(n).padStart(2, '0');
   return `${d.getFullYear()}.${pad(d.getMonth() + 1)}.${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+function cpRandomPairCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let s = '';
+  for (let i = 0; i < 6; i++) s += chars[Math.floor(Math.random() * chars.length)];
+  return s;
+}
+
+// ============ NETWORK LAYER (PeerJS) ============
+const CoupleNet = {
+  peer: null,
+  conn: null,
+  state: 'off',          // 'off' | 'starting' | 'waiting' | 'online'
+  pairCode: null,
+  mySlot: null,
+  partnerSlot: null,
+  outboxKey: null,
+  handlers: {},
+  retryTimer: null,
+  reconnectTimer: null,
+  stopped: true,
+
+  start(pairCode, mySlot) {
+    if (this.pairCode === pairCode && this.mySlot === mySlot && this.peer && !this.peer.destroyed) {
+      // already running with same params
+      return;
+    }
+    this.stop();
+    this.stopped = false;
+    this.pairCode = pairCode;
+    this.mySlot = mySlot;
+    this.partnerSlot = mySlot === 'a' ? 'b' : 'a';
+    this.outboxKey = OUTBOX_KEY_PREFIX + pairCode + '.' + mySlot;
+    this._init();
+  },
+
+  stop() {
+    this.stopped = true;
+    if (this.retryTimer) { clearTimeout(this.retryTimer); this.retryTimer = null; }
+    if (this.reconnectTimer) { clearTimeout(this.reconnectTimer); this.reconnectTimer = null; }
+    if (this.conn) { try { this.conn.close(); } catch (e) {} this.conn = null; }
+    if (this.peer) { try { this.peer.destroy(); } catch (e) {} this.peer = null; }
+    this._setState('off');
+  },
+
+  _peerIdFor(slot) {
+    return PEER_ID_PREFIX + this.pairCode + '-' + slot;
+  },
+
+  _init() {
+    if (typeof Peer === 'undefined') {
+      console.error('[CoupleNet] PeerJS library not loaded');
+      this._setState('off');
+      return;
+    }
+    this._setState('starting');
+    const myId = this._peerIdFor(this.mySlot);
+    try {
+      this.peer = new Peer(myId, { debug: 0 });
+    } catch (e) {
+      console.error('[CoupleNet] Peer ctor failed', e);
+      this._scheduleReinit();
+      return;
+    }
+    this.peer.on('open', () => {
+      this._setState('waiting');
+      this._tryConnect();
+    });
+    this.peer.on('connection', (c) => { this._attach(c); });
+    this.peer.on('disconnected', () => {
+      // disconnected from broker but might reconnect; conn may still be alive
+      try { this.peer.reconnect(); } catch (_) {}
+    });
+    this.peer.on('error', (err) => {
+      const t = err && err.type;
+      if (t === 'unavailable-id') {
+        // Some other device is already claiming our slot id. Likely an old
+        // tab. Wait then try with a one-shot random suffix.
+        console.warn('[CoupleNet] unavailable-id, retrying');
+        this._scheduleReinit(8000);
+      } else if (t === 'peer-unavailable') {
+        // Partner not online — schedule retry
+        this._scheduleConnectRetry();
+      } else if (t === 'network' || t === 'server-error' || t === 'socket-error' || t === 'socket-closed') {
+        this._scheduleReinit();
+      } else {
+        // Other errors: log + retry
+        console.warn('[CoupleNet] peer error', err);
+        this._scheduleConnectRetry();
+      }
+    });
+  },
+
+  _scheduleReinit(delay) {
+    if (this.stopped) return;
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    this.reconnectTimer = setTimeout(() => {
+      if (this.stopped) return;
+      if (this.peer) { try { this.peer.destroy(); } catch (_) {} this.peer = null; }
+      this._init();
+    }, delay || 5000);
+  },
+
+  _scheduleConnectRetry(delay) {
+    if (this.stopped) return;
+    if (this.retryTimer) clearTimeout(this.retryTimer);
+    this.retryTimer = setTimeout(() => { this._tryConnect(); }, delay || 4000);
+  },
+
+  _tryConnect() {
+    if (this.stopped) return;
+    if (this.conn && this.conn.open) return;
+    if (!this.peer || !this.peer.id) return;
+    try {
+      const c = this.peer.connect(this._peerIdFor(this.partnerSlot), { reliable: true, serialization: 'binary' });
+      let opened = false;
+      c.on('open', () => { opened = true; this._attach(c); });
+      c.on('error', () => { if (!opened) this._scheduleConnectRetry(); });
+      // If never opens, schedule retry
+      setTimeout(() => { if (!opened && this.state !== 'online') this._scheduleConnectRetry(); }, 7000);
+    } catch (e) {
+      this._scheduleConnectRetry();
+    }
+  },
+
+  _attach(conn) {
+    if (this.conn && this.conn !== conn && this.conn.open) {
+      // Already have one — keep existing, drop new
+      try { conn.close(); } catch (_) {}
+      return;
+    }
+    this.conn = conn;
+    this._setState('online');
+    conn.on('data', (d) => this._emit('message', d));
+    conn.on('close', () => {
+      if (this.conn === conn) this.conn = null;
+      if (!this.stopped) {
+        this._setState('waiting');
+        this._scheduleConnectRetry(2000);
+      }
+    });
+    conn.on('error', (e) => { console.warn('[CoupleNet] conn error', e); });
+    this._emit('connected');
+    // Flush queued messages
+    this._flushOutbox();
+  },
+
+  send(msg) {
+    if (this.conn && this.conn.open) {
+      try { this.conn.send(msg); return true; }
+      catch (e) { console.warn('[CoupleNet] send failed', e); this._queue(msg); return false; }
+    }
+    this._queue(msg);
+    return false;
+  },
+
+  _queue(msg) {
+    if (!this.outboxKey) return;
+    if (msg && msg.skipQueue) return;
+    try {
+      const raw = localStorage.getItem(this.outboxKey);
+      const list = raw ? JSON.parse(raw) : [];
+      // Replace blob-y msgs with metadata since localStorage can't hold large Blobs
+      const safe = this._stripForQueue(msg);
+      if (safe) {
+        list.push(safe);
+        // Cap outbox to last 50 items to avoid runaway growth
+        const trimmed = list.length > 50 ? list.slice(-50) : list;
+        localStorage.setItem(this.outboxKey, JSON.stringify(trimmed));
+      }
+    } catch (e) { /* localStorage full or other; ignore */ }
+  },
+
+  _stripForQueue(msg) {
+    if (!msg || typeof msg !== 'object') return msg;
+    // Track messages contain large Blobs — don't queue those (partner can re-send later)
+    if (msg.type === 'track') return null;
+    return msg;
+  },
+
+  _flushOutbox() {
+    if (!this.outboxKey) return;
+    try {
+      const raw = localStorage.getItem(this.outboxKey);
+      if (!raw) return;
+      const list = JSON.parse(raw) || [];
+      localStorage.removeItem(this.outboxKey);
+      for (const m of list) {
+        if (this.conn && this.conn.open) {
+          try { this.conn.send(m); } catch (e) { console.warn(e); }
+        }
+      }
+    } catch (e) {}
+  },
+
+  _setState(s) {
+    if (this.state === s) return;
+    this.state = s;
+    this._emit('state', s);
+  },
+
+  on(event, fn) {
+    if (!this.handlers[event]) this.handlers[event] = [];
+    this.handlers[event].push(fn);
+    return () => this.off(event, fn);
+  },
+  off(event, fn) {
+    if (!this.handlers[event]) return;
+    this.handlers[event] = this.handlers[event].filter(f => f !== fn);
+  },
+  _emit(event, data) {
+    (this.handlers[event] || []).forEach(fn => {
+      try { fn(data); } catch (e) { console.error(e); }
+    });
+  },
+};
+
+// Expose to window so other modules / debugging can reach it
+if (typeof window !== 'undefined') window.CoupleNet = CoupleNet;
+
+// ============ Notifications ============
+function cpRequestNotificationPermission() {
+  if (!('Notification' in window)) return Promise.resolve('denied');
+  if (Notification.permission === 'granted' || Notification.permission === 'denied') {
+    return Promise.resolve(Notification.permission);
+  }
+  return Notification.requestPermission();
+}
+function cpSystemNotify(title, body) {
+  if (!('Notification' in window)) return;
+  if (Notification.permission !== 'granted') return;
+  try { new Notification(title, { body }); } catch (e) {}
+}
+function cpToast(detail) {
+  try { window.dispatchEvent(new CustomEvent('couple:toast', { detail })); } catch (e) {}
+}
 
 // ============ HOOK ============
 function useCouple() {
   const [state, setState] = cpUseState(() => cpLoad() || cpDefault());
-  const [incomingHash, setIncomingHash] = cpUseState(null);
-  const importedRef = cpUseRef(false);
+  const [netState, setNetState] = cpUseState(() => CoupleNet.state);
 
-  cpUseEffect(() => { cpSave(state); }, [state]);
+  const stateRef = cpUseRef(state);
+  cpUseEffect(() => { stateRef.current = state; cpSave(state); }, [state]);
 
+  // Wire CoupleNet to React state when logged in
   cpUseEffect(() => {
-    if (importedRef.current) return;
-    importedRef.current = true;
-    if (!window.location.hash.startsWith('#m=')) return;
-    const enc = window.location.hash.slice(3);
-    const incoming = cpDecode(enc);
-    history.replaceState(null, '', window.location.pathname + window.location.search);
-    if (!incoming || typeof incoming !== 'object') return;
-
-    setIncomingHash(incoming);
-
-    setState(s => {
-      if (!s.setupAt) {
-        // Setup not done yet — just prefill names from incoming
-        return {
-          ...s,
-          users: {
-            a: { name: incoming.users?.a?.name || s.users.a.name || '' },
-            b: { name: incoming.users?.b?.name || s.users.b.name || '' },
-          },
-          letters: incoming.letters || [],
-          counters: incoming.counters || [],
-          alarms: incoming.alarms || [],
-        };
-      }
-      // Already set up — merge new items, but never overwrite OUR own name.
-      const existingLetters = new Set(s.letters.map(l => l.id));
-      const newLetters = (incoming.letters || []).filter(l => l && l.id && !existingLetters.has(l.id));
-      const existingCounters = new Set((s.counters || []).map(c => c.id));
-      const newCounters = (incoming.counters || []).filter(c => c && c.id && !existingCounters.has(c.id));
-      const existingAlarms = new Set((s.alarms || []).map(a => a.id));
-      const newAlarms = (incoming.alarms || []).filter(a => a && a.id && !existingAlarms.has(a.id));
-      const totalNew = newLetters.length + newCounters.length + newAlarms.length;
-      if (totalNew > 0) {
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('couple:sync', {
-            detail: {
-              letters: newLetters.length,
-              counters: newCounters.length,
-              alarms: newAlarms.length,
-            },
-          }));
-        }, 200);
-      }
-      const mergedUsers = {
-        a: { name: (s.myUserId === 'a' ? s.users.a?.name : (s.users.a?.name || incoming.users?.a?.name)) || '' },
-        b: { name: (s.myUserId === 'b' ? s.users.b?.name : (s.users.b?.name || incoming.users?.b?.name)) || '' },
-      };
-      return {
-        ...s,
-        users: mergedUsers,
-        letters: [...s.letters, ...newLetters].sort((a, b) => a.ts - b.ts),
-        counters: [...(s.counters || []), ...newCounters],
-        alarms: [...(s.alarms || []), ...newAlarms],
-      };
+    if (!state.setupAt || !state.pairCode || !state.myUserId) {
+      CoupleNet.stop();
+      setNetState('off');
+      return;
+    }
+    CoupleNet.start(state.pairCode, state.myUserId);
+    const offState = CoupleNet.on('state', s => setNetState(s));
+    const offConnected = CoupleNet.on('connected', () => {
+      // Send hello + sync-bulk on connect
+      CoupleNet.send({
+        type: 'hello',
+        name: stateRef.current.users[stateRef.current.myUserId]?.name || '',
+        slot: stateRef.current.myUserId,
+      });
+      CoupleNet.send({
+        type: 'sync-bulk',
+        users: stateRef.current.users,
+        letters: stateRef.current.letters,
+        counters: stateRef.current.counters,
+        alarms: stateRef.current.alarms,
+      });
     });
-  }, []);
+    const offMsg = CoupleNet.on('message', (m) => handleIncoming(m));
+    return () => { offState(); offConnected(); offMsg(); };
+    // Only re-start when pairCode or slot actually changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state.pairCode, state.myUserId, state.setupAt]);
 
-  // Setup completion
-  const completeSetup = ({ myUserId, myName, partnerName, myPin }) => {
+  // ----- Incoming message handler -----
+  function handleIncoming(m) {
+    if (!m || typeof m !== 'object') return;
+    const t = m.type;
+    if (t === 'hello') {
+      // Partner came online: store their name + toast
+      setState(s => {
+        const slot = m.slot || (s.myUserId === 'a' ? 'b' : 'a');
+        const newUsers = { ...s.users, [slot]: { name: m.name || s.users[slot]?.name || '' } };
+        return { ...s, users: newUsers };
+      });
+      const name = m.name || 'Хамтрагч';
+      cpToast({ kind: 'presence', text: name + ' холбогдлоо' });
+    }
+    else if (t === 'sync-bulk') {
+      setState(s => mergeIncoming(s, m));
+    }
+    else if (t === 'letter') {
+      setState(s => {
+        if (s.letters.some(l => l.id === m.letter.id)) return s;
+        const next = { ...s, letters: [...s.letters, m.letter].sort((a, b) => a.ts - b.ts) };
+        return next;
+      });
+      const fromName = stateRef.current.users[m.letter?.from]?.name || 'Хамтрагч';
+      cpToast({ kind: 'letter', text: '✉ ' + fromName + ': ' + (m.letter.text || '').slice(0, 60) });
+      cpSystemNotify('✉ Шинэ захидал', fromName + ': ' + (m.letter.text || '').slice(0, 80));
+    }
+    else if (t === 'letter-del') {
+      setState(s => ({ ...s, letters: s.letters.filter(l => l.id !== m.id) }));
+    }
+    else if (t === 'counter-add') {
+      setState(s => {
+        const cs = s.counters || [];
+        if (cs.some(c => c.id === m.counter.id)) return s;
+        return { ...s, counters: [...cs, m.counter] };
+      });
+      cpToast({ kind: 'counter', text: '⏱ Шинэ тоолуур: ' + (m.counter?.title || '') });
+    }
+    else if (t === 'counter-del') {
+      setState(s => ({ ...s, counters: (s.counters || []).filter(c => c.id !== m.id) }));
+    }
+    else if (t === 'alarm-add') {
+      setState(s => {
+        const as = s.alarms || [];
+        if (as.some(a => a.id === m.alarm.id)) return s;
+        return { ...s, alarms: [...as, m.alarm] };
+      });
+      cpToast({ kind: 'alarm', text: '🔔 Шинэ дохиолол: ' + (m.alarm?.title || '') });
+      cpSystemNotify('🔔 Шинэ дохиолол', m.alarm?.title || '');
+    }
+    else if (t === 'alarm-del') {
+      setState(s => ({ ...s, alarms: (s.alarms || []).filter(a => a.id !== m.id) }));
+    }
+    else if (t === 'track') {
+      // Audio track sharing — handed off to vinyl-player listener via window event
+      try {
+        window.dispatchEvent(new CustomEvent('couple:track', { detail: m }));
+      } catch (e) {}
+      const title = m.track?.title || 'Дуу';
+      cpToast({ kind: 'track', text: '♪ ' + title + ' — санд хадгалагдлаа' });
+      cpSystemNotify('♪ Шинэ дуу', title);
+    }
+  }
+
+  function mergeIncoming(s, m) {
+    const next = { ...s };
+    // Users: preserve our own name, accept partner's
+    if (m.users) {
+      next.users = {
+        a: { name: (s.myUserId === 'a' ? s.users.a?.name : (s.users.a?.name || m.users.a?.name)) || '' },
+        b: { name: (s.myUserId === 'b' ? s.users.b?.name : (s.users.b?.name || m.users.b?.name)) || '' },
+      };
+    }
+    // Letters
+    if (Array.isArray(m.letters)) {
+      const have = new Set(s.letters.map(l => l.id));
+      const incoming = m.letters.filter(l => l && l.id && !have.has(l.id));
+      next.letters = [...s.letters, ...incoming].sort((a, b) => a.ts - b.ts);
+    }
+    // Counters
+    if (Array.isArray(m.counters)) {
+      const have = new Set((s.counters || []).map(c => c.id));
+      next.counters = [...(s.counters || []), ...m.counters.filter(c => c && c.id && !have.has(c.id))];
+    }
+    // Alarms
+    if (Array.isArray(m.alarms)) {
+      const have = new Set((s.alarms || []).map(a => a.id));
+      next.alarms = [...(s.alarms || []), ...m.alarms.filter(a => a && a.id && !have.has(a.id))];
+    }
+    return next;
+  }
+
+  // ----- Setup completion -----
+  const completeSetup = ({ myUserId, myName, pairCode, myPin }) => {
     setState(s => {
       const users = {
-        a: { name: myUserId === 'a' ? myName : partnerName },
-        b: { name: myUserId === 'b' ? myName : partnerName },
+        a: { name: myUserId === 'a' ? myName : (s.users.a?.name || '') },
+        b: { name: myUserId === 'b' ? myName : (s.users.b?.name || '') },
       };
       return {
         ...s,
-        users,
+        pairCode,
         myUserId,
         myPin,
         isLoggedIn: true,
+        users,
         setupAt: Date.now(),
       };
     });
+    cpRequestNotificationPermission();
   };
 
   const login = (pin) => {
@@ -2859,79 +3263,91 @@ function useCouple() {
     return false;
   };
   const logout = () => setState(s => ({ ...s, isLoggedIn: false }));
-  const changePin = (newPin) => {
-    if (!/^\d{4,6}$/.test(newPin)) return false;
-    setState(s => ({ ...s, myPin: newPin }));
-    return true;
-  };
   const resetAll = () => {
+    if (CoupleNet) CoupleNet.stop();
     localStorage.removeItem(COUPLE_KEY);
+    // Clear all outboxes for this user
+    try {
+      const keys = Object.keys(localStorage).filter(k => k.startsWith(OUTBOX_KEY_PREFIX));
+      keys.forEach(k => localStorage.removeItem(k));
+    } catch (e) {}
     setState(cpDefault());
   };
 
+  // ----- Actions (local update + network broadcast) -----
   const sendLetter = (text) => {
     const t = (text || '').trim();
     if (!t || !state.myUserId) return null;
     const from = state.myUserId;
     const to = from === 'a' ? 'b' : 'a';
     const letter = { id: cpUid(), from, to, text: t, ts: Date.now() };
-    const nextState = { ...state, letters: [...state.letters, letter] };
-    setState(nextState);
-    return { letter, nextState };
+    setState(s => ({ ...s, letters: [...s.letters, letter] }));
+    CoupleNet.send({ type: 'letter', letter });
+    return letter;
   };
-  const deleteLetter = (id) => setState(s => ({ ...s, letters: s.letters.filter(l => l.id !== id) }));
-
+  const deleteLetter = (id) => {
+    setState(s => ({ ...s, letters: s.letters.filter(l => l.id !== id) }));
+    CoupleNet.send({ type: 'letter-del', id });
+  };
   const addCounter = (counter) => {
     const c = { ...counter, id: cpUid(), createdAt: Date.now() };
-    const nextState = { ...state, counters: [...(state.counters || []), c] };
-    setState(nextState);
-    return nextState;
+    setState(s => ({ ...s, counters: [...(s.counters || []), c] }));
+    CoupleNet.send({ type: 'counter-add', counter: c });
+    return c;
   };
-  const deleteCounter = (id) => setState(s => ({ ...s, counters: (s.counters || []).filter(c => c.id !== id) }));
-
+  const deleteCounter = (id) => {
+    setState(s => ({ ...s, counters: (s.counters || []).filter(c => c.id !== id) }));
+    CoupleNet.send({ type: 'counter-del', id });
+  };
   const addAlarm = (alarm) => {
     const a = { ...alarm, id: cpUid(), createdAt: Date.now() };
-    const nextState = { ...state, alarms: [...(state.alarms || []), a] };
-    setState(nextState);
-    return nextState;
+    setState(s => ({ ...s, alarms: [...(s.alarms || []), a] }));
+    CoupleNet.send({ type: 'alarm-add', alarm: a });
+    return a;
   };
-  const deleteAlarm = (id) => setState(s => ({ ...s, alarms: (s.alarms || []).filter(a => a.id !== id) }));
+  const deleteAlarm = (id) => {
+    setState(s => ({ ...s, alarms: (s.alarms || []).filter(a => a.id !== id) }));
+    CoupleNet.send({ type: 'alarm-del', id });
+  };
 
   return {
-    state, setState, incomingHash,
-    completeSetup, login, logout, changePin, resetAll,
+    state, netState,
+    completeSetup, login, logout, resetAll,
     sendLetter, deleteLetter,
     addCounter, deleteCounter,
     addAlarm, deleteAlarm,
   };
 }
 
-// ============ SETUP ============
-function CoupleSetup({ state, incomingHash, onComplete }) {
-  const hasIncoming = !!incomingHash;
-  const inA = incomingHash?.users?.a?.name || state.users.a?.name || '';
-  const inB = incomingHash?.users?.b?.name || state.users.b?.name || '';
-
-  // Auto-pick: if exactly one slot is filled by incoming, I take the other.
-  let autoUserId = null;
-  let senderName = '';
-  if (inA && !inB) { autoUserId = 'b'; senderName = inA; }
-  else if (!inA && inB) { autoUserId = 'a'; senderName = inB; }
-  else if (!inA && !inB) { autoUserId = 'a'; } // brand new — I'm first
-  // Both filled → autoUserId stays null and we fall back to picker.
-
-  const [step, setStep] = cpUseState(autoUserId === null ? 'pick' : 'name');
-  const [myUserId, setMyUserId] = cpUseState(autoUserId);
+// ============ SETUP UI ============
+function CoupleSetup({ state, onComplete }) {
+  // step: 'choose' | 'created' | 'enter-code' | 'name' | 'pin'
+  const [step, setStep] = cpUseState('choose');
+  const [pairCode, setPairCode] = cpUseState('');
+  const [myUserId, setMyUserId] = cpUseState(null);
   const [myName, setMyName] = cpUseState('');
   const [myPin, setMyPin] = cpUseState('');
   const [confirmPin, setConfirmPin] = cpUseState('');
   const [err, setErr] = cpUseState('');
 
-  const partnerKnownName = myUserId === 'a' ? inB : (myUserId === 'b' ? inA : '');
+  const handleCreate = () => {
+    const code = cpRandomPairCode();
+    setPairCode(code);
+    setMyUserId('a');
+    setStep('created');
+  };
 
-  const handlePick = (id) => {
-    setMyUserId(id);
-    setMyName(id === 'a' ? inA : inB);
+  const handleEnter = () => {
+    setMyUserId('b');
+    setStep('enter-code');
+  };
+
+  const submitCode = (e) => {
+    e.preventDefault();
+    const code = pairCode.trim().toUpperCase();
+    if (!/^[A-Z0-9]{4,8}$/.test(code)) { setErr('Кодыг 4-8 оронтой үсэг/тоогоор оруулна уу'); return; }
+    setErr('');
+    setPairCode(code);
     setStep('name');
   };
 
@@ -2947,12 +3363,11 @@ function CoupleSetup({ state, incomingHash, onComplete }) {
     if (!/^\d{4,6}$/.test(myPin)) { setErr('PIN-ийг 4-6 оронтой тоогоор оруулна уу'); return; }
     if (myPin !== confirmPin) { setErr('PIN таарахгүй байна'); return; }
     setErr('');
-    onComplete({
-      myUserId,
-      myName: myName.trim(),
-      partnerName: partnerKnownName.trim(),
-      myPin,
-    });
+    onComplete({ myUserId, myName: myName.trim(), pairCode, myPin });
+  };
+
+  const copyCode = async () => {
+    try { await navigator.clipboard.writeText(pairCode); } catch (e) {}
   };
 
   return (
@@ -2960,36 +3375,64 @@ function CoupleSetup({ state, incomingHash, onComplete }) {
       <div className="couple-setup-card">
         <div className="setup-header">
           <h2>★ ХУВИЙН ОРОН ЗАЙ ★</h2>
-          <p>
-            {hasIncoming && senderName
-              ? <><b>{senderName}</b>-ээс холбоос ирлээ. Та өөрийгөө таниулна уу.</>
-              : 'Энэ төхөөрөмж дээр ЗӨВХӨН та өөрөө хэрэглэнэ. Хамтрагч чинь өөрийн төхөөрөмж дээрээ адилхан энэ файлыг нээж, өөрийн нэр, PIN-ээ тохируулна.'}
-          </p>
+          <p>P2P холболттой — захидал, тоолуур, дохиолол real-time-аар нөгөө хүндээ очно.</p>
         </div>
 
-        <div className="setup-steps">
-          <div className={`setup-step ${step === 'pick' || step === 'name' ? 'active' : 'done'}`}>1</div>
-          <div className="setup-step-line"></div>
-          <div className={`setup-step ${step === 'pin' ? 'active' : (step === 'name' || step === 'pick' ? '' : 'done')}`}>2</div>
-        </div>
-
-        {step === 'pick' && (
+        {step === 'choose' && (
           <div>
             <div className="setup-field">
-              <label>Та хэн нь вэ?</label>
-              <div className="setup-radios">
-                <button type="button" className="setup-radio" onClick={() => handlePick('a')}>
+              <label>Хэрхэн эхлэх вэ?</label>
+              <div className="setup-radios" style={{ gridTemplateColumns: '1fr' }}>
+                <button type="button" className="setup-radio" onClick={handleCreate}>
                   <span className="dot"></span>
-                  <span>{inA || 'A'}</span>
+                  <span>★ Шинэ хос үүсгэх (код үүсгэх)</span>
                 </button>
-                <button type="button" className="setup-radio" onClick={() => handlePick('b')}>
+                <button type="button" className="setup-radio" onClick={handleEnter}>
                   <span className="dot pink"></span>
-                  <span>{inB || 'B'}</span>
+                  <span>↪ Хамтрагчаас ирсэн код оруулах</span>
                 </button>
               </div>
             </div>
-            <div className="setup-hint">Сонгосон хүн л энэ төхөөрөмжөөс орох боломжтой.</div>
+            <div className="setup-hint">
+              Шинээр эхлэхээр код үүснэ. Үүнийг нөгөө хүндээ messenger/SMS-ээр явуулна. Тэр код оруулсны дараа хоёулаа real-time холбогдох болно.
+            </div>
           </div>
+        )}
+
+        {step === 'created' && (
+          <div>
+            <div className="setup-field">
+              <label>Таны хосын код</label>
+              <div className="pair-code-box">
+                <span className="pair-code-text">{pairCode}</span>
+                <button type="button" className="pair-code-copy" onClick={copyCode}>📋 Хуулах</button>
+              </div>
+            </div>
+            <div className="setup-hint" style={{ textAlign: 'left' }}>
+              Энэ кодыг хамтрагчдаа явуулна уу (messenger, SMS, и.и.). Тэр энэ кодыг өөрийн төхөөрөмж дээр оруулсны дараа л хоёр тал холбогдоно.
+            </div>
+            <button type="button" className="setup-start" onClick={() => setStep('name')}>Үргэлжлүүлэх →</button>
+          </div>
+        )}
+
+        {step === 'enter-code' && (
+          <form onSubmit={submitCode}>
+            <div className="setup-field">
+              <label>Хамтрагчаас ирсэн код</label>
+              <input
+                type="text"
+                value={pairCode}
+                onChange={e => setPairCode(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 8))}
+                placeholder="Жнь: 7X4PQR"
+                maxLength={8}
+                autoFocus
+                style={{ textTransform: 'uppercase', letterSpacing: 4, textAlign: 'center', fontSize: 22 }}
+              />
+            </div>
+            {err && <div className="setup-err">{err}</div>}
+            <button type="submit" className="setup-start">Үргэлжлүүлэх →</button>
+            <div className="setup-hint">Код хамтрагчийнхтай яг адил байх ёстой.</div>
+          </form>
         )}
 
         {step === 'name' && (
@@ -3008,9 +3451,7 @@ function CoupleSetup({ state, incomingHash, onComplete }) {
             {err && <div className="setup-err">{err}</div>}
             <button type="submit" className="setup-start">Үргэлжлүүлэх →</button>
             <div className="setup-hint">
-              {partnerKnownName
-                ? <>Хамтрагч чинь: <b>{partnerKnownName}</b></>
-                : 'Хамтрагчийнхаа нэр нь түүнтэй захидал солилцох үед автоматаар орж ирнэ.'}
+              Хосын код: <b>{pairCode}</b>
             </div>
           </form>
         )}
@@ -3042,7 +3483,7 @@ function CoupleSetup({ state, incomingHash, onComplete }) {
             </div>
             {err && <div className="setup-err">{err}</div>}
             <button type="submit" className="setup-start">► ОРОХ</button>
-            <div className="setup-hint">PIN-г зөвхөн энэ төхөөрөмж дотор хадгална. Алдвал бүгдийг сэргээнэ.</div>
+            <div className="setup-hint">PIN зөвхөн энэ төхөөрөмж дотор хадгалагдана.</div>
           </form>
         )}
       </div>
@@ -3059,14 +3500,9 @@ function CoupleLogin({ state, onLogin, onReset }) {
   const submit = (e) => {
     e.preventDefault();
     if (!pin) return;
-    if (onLogin(pin)) {
-      setErr('');
-    } else {
-      setErr('PIN буруу байна');
-      setPin('');
-    }
+    if (onLogin(pin)) { setErr(''); }
+    else { setErr('PIN буруу байна'); setPin(''); }
   };
-
   const handleReset = () => {
     if (window.confirm('Бүгдийг сэргээх үү? Хадгалсан өгөгдөл (захидал, тоолуур, дохиолол) устана.')) {
       onReset();
@@ -3105,10 +3541,16 @@ function CoupleLogin({ state, onLogin, onReset }) {
   );
 }
 
-// ============ PROFILE BAR ============
+// ============ PROFILE BAR (with presence) ============
 function ProfileBar({ couple }) {
   const me = couple.state.users[couple.state.myUserId];
   const partner = couple.state.users[couple.state.myUserId === 'a' ? 'b' : 'a'];
+  const netState = couple.netState;
+
+  let presenceLabel, presenceClass;
+  if (netState === 'online') { presenceLabel = '● ONLINE'; presenceClass = 'on'; }
+  else if (netState === 'waiting' || netState === 'starting') { presenceLabel = '○ ХҮЛЭЭЖ БНА'; presenceClass = 'mid'; }
+  else { presenceLabel = '✗ OFFLINE'; presenceClass = 'off'; }
 
   return (
     <div className="profile-bar">
@@ -3119,15 +3561,40 @@ function ProfileBar({ couple }) {
       <div className="profile-divider">·</div>
       <div className="profile-cell partner">
         <span className="profile-label">ХАМТРАГЧ</span>
-        <span className="profile-name">{partner?.name}</span>
+        <span className="profile-name">{partner?.name || '—'}</span>
       </div>
+      <span className={`presence-badge ${presenceClass}`}>{presenceLabel}</span>
+      <span className="pair-badge" title="Хосын код">{couple.state.pairCode || '—'}</span>
       <button
         className="profile-logout"
-        onClick={() => {
-          if (window.confirm('Гарах уу?')) couple.logout();
-        }}
+        onClick={() => { if (window.confirm('Гарах уу?')) couple.logout(); }}
         title="Гарах"
       >↶ Гарах</button>
+    </div>
+  );
+}
+
+// ============ TOAST CONTAINER ============
+function ToastContainer() {
+  const [items, setItems] = cpUseState([]);
+  cpUseEffect(() => {
+    const handler = (e) => {
+      const id = cpUid();
+      setItems(list => [...list, { id, ...e.detail }]);
+      setTimeout(() => setItems(list => list.filter(t => t.id !== id)), 6500);
+    };
+    window.addEventListener('couple:toast', handler);
+    return () => window.removeEventListener('couple:toast', handler);
+  }, []);
+  if (items.length === 0) return null;
+  return (
+    <div className="toast-stack">
+      {items.map(t => (
+        <div key={t.id} className={`toast toast-${t.kind || 'default'}`}>
+          <span>{t.text}</span>
+          <button type="button" className="toast-close" onClick={() => setItems(list => list.filter(x => x.id !== t.id))}>×</button>
+        </div>
+      ))}
     </div>
   );
 }
@@ -3135,46 +3602,19 @@ function ProfileBar({ couple }) {
 // ============ LETTERS ============
 function LettersSection({ couple }) {
   const [text, setText] = cpUseState('');
-  const [share, setShare] = cpUseState(null);
-  const [notice, setNotice] = cpUseState('');
 
   const me = couple.state.myUserId;
   const meUser = couple.state.users[me];
   const partner = couple.state.users[me === 'a' ? 'b' : 'a'];
-
-  cpUseEffect(() => {
-    const handler = (e) => {
-      const parts = [];
-      if (e.detail.letters) parts.push(`${e.detail.letters} захидал`);
-      if (e.detail.counters) parts.push(`${e.detail.counters} тоолуур`);
-      if (e.detail.alarms) parts.push(`${e.detail.alarms} дохиолол`);
-      if (parts.length) {
-        setNotice('✓ ' + parts.join(', ') + ' нэгдлээ');
-        setTimeout(() => setNotice(''), 6000);
-      }
-    };
-    window.addEventListener('couple:sync', handler);
-    return () => window.removeEventListener('couple:sync', handler);
-  }, []);
+  const isOnline = couple.netState === 'online';
 
   const handleSend = (e) => {
     e?.preventDefault();
-    const result = couple.sendLetter(text);
-    if (!result) return;
+    const letter = couple.sendLetter(text);
+    if (!letter) return;
     setText('');
-    const hash = '#m=' + cpEncode(result.nextState);
-    const link = `${window.location.origin}${window.location.pathname}${hash}`;
-    setShare({ link, partnerName: partner?.name });
-  };
-
-  const copyLink = async () => {
-    try {
-      await navigator.clipboard.writeText(share.link);
-      setNotice('✓ Холбоос хуулагдлаа');
-      setTimeout(() => setNotice(''), 2500);
-    } catch (e) {
-      setNotice('Хуулж чадсангүй — гараар сонгож хуулна уу.');
-      setTimeout(() => setNotice(''), 4000);
+    if (!isOnline) {
+      cpToast({ kind: 'queued', text: '⌛ Захидал дараалалд орлоо. Хамтрагч online болоход илгээгдэнэ.' });
     }
   };
 
@@ -3189,7 +3629,7 @@ function LettersSection({ couple }) {
       </div>
 
       <div className="section-desc">
-        Хамтрагчтайгаа бичсэн захидлууд энд хадгалагдана. Илгээх товчоор холбоос үүсэх ба түүгээр нь хамтрагч чинь захидлыг чинь уншиж, хариу бичнэ.
+        Бичсэн захидал хамтрагчдаа real-time шууд очно. Хамтрагч offline байвал дараалалд орж, online болоход илгээгдэнэ.
       </div>
 
       <div className="letters-card">
@@ -3197,8 +3637,6 @@ function LettersSection({ couple }) {
           <span className="letters-title">📬 ЗАХИДЛЫН ТҮҮХ</span>
           <span className="letters-count">{letters.length}</span>
         </div>
-
-        {notice && <div className="letters-notice">{notice}</div>}
 
         <div className="letters-history">
           {letters.length === 0 ? (
@@ -3219,9 +3657,7 @@ function LettersSection({ couple }) {
                   {isMine && (
                     <button
                       className="letter-del"
-                      onClick={() => {
-                        if (window.confirm('Энэ захидлыг устгах уу?')) couple.deleteLetter(l.id);
-                      }}
+                      onClick={() => { if (window.confirm('Энэ захидлыг устгах уу?')) couple.deleteLetter(l.id); }}
                       title="Устгах"
                     >×</button>
                   )}
@@ -3233,13 +3669,16 @@ function LettersSection({ couple }) {
 
         <form className="letter-composer" onSubmit={handleSend}>
           <div className="composer-head">
-            <b>{meUser?.name}</b> → <b>{partner?.name}</b>
+            <b>{meUser?.name}</b> → <b>{partner?.name || '—'}</b>
+            <span className={`composer-presence ${isOnline ? 'on' : 'off'}`}>
+              {isOnline ? '● ONLINE — шууд илгээгдэнэ' : '○ OFFLINE — хүлээгдэх дараалалд орно'}
+            </span>
           </div>
           <textarea
             className="composer-area"
             value={text}
             onChange={e => setText(e.target.value)}
-            placeholder={`${partner?.name}-д бичих...`}
+            placeholder={`${partner?.name || 'Хамтрагч'}-д бичих...`}
             rows={4}
             maxLength={2000}
           />
@@ -3251,34 +3690,13 @@ function LettersSection({ couple }) {
           </div>
         </form>
       </div>
-
-      {share && (
-        <div className="share-modal" onClick={(e) => { if (e.target === e.currentTarget) setShare(null); }}>
-          <div className="share-card">
-            <button className="share-close" onClick={() => setShare(null)}>×</button>
-            <div className="share-emoji">✉</div>
-            <h3>Захидал илгээгдлээ</h3>
-            <p>
-              Доорх холбоосыг <b>{share.partnerName}</b>-д явуулна уу.<br/>
-              Тэр энэ холбоосоор нэвтрэхэд захидал нь автоматаар орж ирнэ.
-            </p>
-            <div className="share-link-row">
-              <input type="text" readOnly value={share.link} onClick={e => e.target.select()}/>
-              <button onClick={copyLink}>📋 ХУУЛАХ</button>
-            </div>
-            <div className="share-hint">
-              💡 Хэрэв 2 уулаа файлыг татаж авсан бол холбоосны "#m=..." хэсгийг л хамтрагчдаа явуулна. Тэр өөрийн файлынхаа URL-ын төгсгөлд залгахад захидал орж ирнэ.
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
 
 Object.assign(window, {
-  useCouple, CoupleSetup, CoupleLogin, ProfileBar, LettersSection,
-  cpLoad, cpSave, cpEncode, cpDecode, cpFmt, cpUid,
+  useCouple, CoupleSetup, CoupleLogin, ProfileBar, LettersSection, ToastContainer,
+  cpFmt, cpUid, cpToast, cpSystemNotify,
 });
 
 /* === events.jsx === */
@@ -4010,6 +4428,64 @@ function VinylPlayer() {
 
   vpUseEffect(() => { reloadLibrary(); }, []);
 
+  // Listen for incoming tracks from partner via CoupleNet
+  vpUseEffect(() => {
+    const handler = async (e) => {
+      try {
+        const detail = e.detail || {};
+        const t = detail.track || {};
+        if (!t.id || !detail.data) return;
+        const exists = await vpGetTrack(t.id);
+        if (exists) return; // already have it
+        const blob = new Blob([detail.data], { type: t.mime || 'audio/webm' });
+        await vpSaveTrack({
+          id: t.id,
+          kind: 'audio',
+          title: t.title || 'Дуу',
+          source: 'received',
+          blob,
+          createdAt: t.createdAt || Date.now(),
+        });
+        await reloadLibrary();
+      } catch (err) { console.warn('incoming track failed', err); }
+    };
+    window.addEventListener('couple:track', handler);
+    return () => window.removeEventListener('couple:track', handler);
+  }, []);
+
+  const sendTrackToPartner = async (id) => {
+    if (!window.CoupleNet || window.CoupleNet.state !== 'online') {
+      window.cpToast && window.cpToast({ kind: 'queued', text: '✗ Хамтрагч offline байна. Online болоход дахин оролдоорой.' });
+      return;
+    }
+    try {
+      const t = await vpGetTrack(id);
+      if (!t || !t.blob) return;
+      if (t.blob.size > 8 * 1024 * 1024) {
+        if (!window.confirm(`Файл ${(t.blob.size / 1024 / 1024).toFixed(1)}MB байна. Илгээх удаашрах магадлалтай. Үргэлжлүүлэх үү?`)) return;
+      }
+      const data = await t.blob.arrayBuffer();
+      const ok = window.CoupleNet.send({
+        type: 'track',
+        track: {
+          id: t.id,
+          title: t.title,
+          source: t.source,
+          createdAt: t.createdAt,
+          mime: t.blob.type || 'audio/webm',
+        },
+        data,
+      });
+      window.cpToast && window.cpToast({
+        kind: ok ? 'track' : 'queued',
+        text: ok ? '♪ Хамтрагч руу илгээгдлээ' : '✗ Илгээж чадсангүй',
+      });
+    } catch (e) {
+      console.warn(e);
+      window.cpToast && window.cpToast({ kind: 'queued', text: '✗ Алдаа: ' + (e.message || e) });
+    }
+  };
+
   const playFromLibrary = async (id) => {
     try {
       const t = await vpGetTrack(id);
@@ -4380,6 +4856,12 @@ function VinylPlayer() {
                     </div>
                     <div className="lib-actions">
                       <button type="button" className="lib-btn" onClick={() => playFromLibrary(t.id)}>▶ Тавих</button>
+                      <button
+                        type="button"
+                        className="lib-btn send"
+                        onClick={() => sendTrackToPartner(t.id)}
+                        title="Хамтрагч руу илгээх (online үед)"
+                      >↗ Илгээх</button>
                       <button type="button" className="lib-btn del" onClick={() => removeFromLibrary(t.id)}>×</button>
                     </div>
                   </li>
@@ -4387,8 +4869,9 @@ function VinylPlayer() {
               </ul>
             )}
             <div className="hint">
-              Бичлэгүүд зөвхөн энэ төхөөрөмж дотор хадгалагдана (browser-ийн IndexedDB).
-              Аудио файлын хэмжээ том учир хамтрагч руу автоматаар илгээгдэхгүй.
+              Бичлэгүүд browser-ийн IndexedDB-д хадгалагдана. "↗ Илгээх" товчоор
+              хамтрагч руу real-time илгээж болно (хоёулаа online үед). Том файл
+              удаан очно — хязгаар ~8MB зөвлөгдөж байна.
             </div>
           </div>
         )}
@@ -4730,28 +5213,34 @@ function App({ couple }) {
 function Root() {
   const couple = useCouple();
 
-  // First time -> setup (choose name + set PIN)
+  // First time -> setup (pair code + name + PIN)
   if (!couple.state.setupAt) {
     return (
-      <CoupleSetup
-        state={couple.state}
-        incomingHash={couple.incomingHash}
-        onComplete={(data) => couple.completeSetup(data)} />);
+      <>
+        <CoupleSetup
+          state={couple.state}
+          onComplete={(data) => couple.completeSetup(data)} />
+        <ToastContainer />
+      </>);
   }
 
   // Logged out -> require PIN to re-enter
   if (!couple.state.isLoggedIn) {
     return (
-      <CoupleLogin
-        state={couple.state}
-        onLogin={couple.login}
-        onReset={couple.resetAll} />);
+      <>
+        <CoupleLogin
+          state={couple.state}
+          onLogin={couple.login}
+          onReset={couple.resetAll} />
+        <ToastContainer />
+      </>);
   }
 
   return (
     <>
       <ProfileBar couple={couple} />
       <App couple={couple} />
+      <ToastContainer />
     </>);
 
 }
